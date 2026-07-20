@@ -11,6 +11,8 @@ const els = {
   text: document.getElementById("entry-text"),
   netStatus: document.getElementById("net-status"),
   installBtn: document.getElementById("install-btn"),
+  iosHint: document.getElementById("ios-hint"),
+  iosHintClose: document.getElementById("ios-hint-close"),
   toast: document.getElementById("toast"),
 };
 
@@ -111,21 +113,52 @@ navigator.serviceWorker?.addEventListener("message", (event) => {
   if (event.data?.type === "FLUSH_SYNC_QUEUE") flushQueue();
 });
 
-// ---------- Install prompt ----------
+// ---------- Install ----------
+// Is the app already running as an installed PWA? Then there's nothing to
+// install — hide all install UI. (iOS exposes the legacy navigator.standalone.)
+function isStandalone() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function isIOS() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+}
+
 let deferredPrompt = null;
+
+// Chromium fires this instead of showing its own mini-infobar. We stash the
+// event and reveal our own button, so install happens on the user's terms.
 window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault(); // stop Chrome's default mini-infobar
+  event.preventDefault();
   deferredPrompt = event;
-  els.installBtn.hidden = false;
+  if (!isStandalone()) els.installBtn.hidden = false;
 });
+
 els.installBtn.addEventListener("click", async () => {
   if (!deferredPrompt) return;
   deferredPrompt.prompt();
-  await deferredPrompt.userChoice;
-  deferredPrompt = null;
+  const { outcome } = await deferredPrompt.userChoice; // "accepted" | "dismissed"
+  deferredPrompt = null;            // the event can only be used once
   els.installBtn.hidden = true;
+  if (outcome === "dismissed") toast("No worries — install anytime from the menu");
 });
-window.addEventListener("appinstalled", () => toast("FieldKit installed 🎉"));
+
+// Fired after a successful install (from our button OR the browser UI).
+window.addEventListener("appinstalled", () => {
+  els.installBtn.hidden = true;
+  els.iosHint.hidden = true;
+  deferredPrompt = null;
+  toast("FieldKit installed");
+});
+
+// iOS/iPadOS never fire beforeinstallprompt, so guide the user by hand.
+els.iosHintClose.addEventListener("click", () => (els.iosHint.hidden = true));
+function maybeShowIosHint() {
+  els.iosHint.hidden = !(isIOS() && !isStandalone());
+}
 
 // ---------- Boot ----------
 async function boot() {
@@ -137,6 +170,7 @@ async function boot() {
     }
   }
   updateNetStatus();
+  maybeShowIosHint();
   await render();
 }
 boot();

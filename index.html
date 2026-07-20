@@ -29,6 +29,12 @@
     <button class="btn btn--primary" type="submit">Add</button>
   </form>
 
+  <!-- iOS has no install prompt, so we show a manual hint there instead. -->
+  <div id="ios-hint" class="ios-hint" hidden>
+    <span>Install FieldKit: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</span>
+    <button id="ios-hint-close" class="ios-hint__close" aria-label="Dismiss">&times;</button>
+  </div>
+
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <script type="module" src="/js/app.js"></script>

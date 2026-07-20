@@ -98,6 +98,37 @@ body {
 }
 .composer__input:focus { outline: none; border-color: var(--accent-2); }
 
+.ios-hint {
+  position: fixed;
+  bottom: 5rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+/* The `hidden` attribute sets display:none via the UA stylesheet, but our
+   author-level `display:flex` above overrides it. This higher-specificity
+   rule makes .ios-hint honour `hidden` again. */
+.ios-hint[hidden] { display: none; }
+.ios-hint strong { color: var(--accent-2); }
+.ios-hint__close {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
 .toast {
   position: fixed;
   bottom: 5rem;
