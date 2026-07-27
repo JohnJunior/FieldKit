@@ -24,10 +24,26 @@
   </main>
 
   <form id="entry-form" class="composer" autocomplete="off">
-    <input id="entry-text" name="text" class="composer__input"
-           placeholder="Add a field note…" required />
-    <button class="btn btn--primary" type="submit">Add</button>
+    <div id="attach-chip" class="chip" hidden>
+      <span id="attach-label">attachment</span>
+      <button type="button" id="attach-remove" aria-label="Remove attachment">&times;</button>
+    </div>
+    <div class="composer__row">
+      <button type="button" id="add-photo" class="btn btn--icon" aria-label="Add photo" title="Add photo">📷</button>
+      <button type="button" id="add-audio" class="btn btn--icon" aria-label="Record audio" title="Record audio">🎙️</button>
+      <input id="entry-text" name="text" class="composer__input" placeholder="Add a field note…" />
+      <button class="btn btn--primary" type="submit">Add</button>
+    </div>
   </form>
+
+  <!-- Live camera preview for photo capture (getUserMedia). -->
+  <div id="camera" class="camera" hidden>
+    <video id="camera-video" class="camera__video" playsinline muted></video>
+    <div class="camera__controls">
+      <button type="button" id="camera-cancel" class="btn btn--ghost">Cancel</button>
+      <button type="button" id="camera-snap" class="btn btn--primary">Capture</button>
+    </div>
+  </div>
 
   <!-- iOS has no install prompt, so we show a manual hint there instead. -->
   <div id="ios-hint" class="ios-hint" hidden>

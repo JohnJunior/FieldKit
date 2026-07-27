@@ -10,7 +10,7 @@ FieldKit is the companion project for an article series exploring what modern PW
 |------------|-------|
 | Offline-first & background sync | ✅ built |
 | Installable (manifest + install prompt) | ✅ built |
-| Capture photos, video & audio | ⬜ planned |
+| Capture photos & audio | ✅ built |
 | Push notifications | ⬜ planned |
 | Open, edit & save files | ⬜ planned |
 | Location-based experiences | ⬜ planned |

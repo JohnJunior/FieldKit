@@ -4,6 +4,7 @@
 // later milestones and imported here.
 
 import { addEntry, getEntries, getUnsynced, markSynced } from "/js/db.js";
+import { capturePhoto, startAudio, stopAudio, isRecording } from "/js/media.js";
 
 const els = {
   entries: document.getElementById("entries"),
@@ -13,8 +14,18 @@ const els = {
   installBtn: document.getElementById("install-btn"),
   iosHint: document.getElementById("ios-hint"),
   iosHintClose: document.getElementById("ios-hint-close"),
+  addPhoto: document.getElementById("add-photo"),
+  addAudio: document.getElementById("add-audio"),
+  attachChip: document.getElementById("attach-chip"),
+  attachLabel: document.getElementById("attach-label"),
+  attachRemove: document.getElementById("attach-remove"),
   toast: document.getElementById("toast"),
 };
+
+// Media the user attached but hasn't submitted yet: { type, blob } | null
+let pendingMedia = null;
+// Object URLs created for the current render, revoked before the next one.
+let objectUrls = [];
 
 // ---------- Rendering ----------
 function entryTemplate(e) {
@@ -24,20 +35,46 @@ function entryTemplate(e) {
     e.lat != null ? `<span class="entry__loc">📍 ${e.lat.toFixed(3)}, ${e.lng.toFixed(3)}</span>` : "";
   return `<article class="entry">
     <p class="entry__text"></p>
+    <div class="entry__media"></div>
     <footer class="entry__meta"><time>${when}</time> ${loc} ${sync}</footer>
   </article>`;
 }
 
+// Turn a stored media Blob into a playable element. We create an object URL
+// per render and revoke the previous batch first, so we don't leak memory.
+function renderMedia(box, media) {
+  const url = URL.createObjectURL(media.blob);
+  objectUrls.push(url);
+  if (media.type === "image") {
+    const img = document.createElement("img");
+    img.className = "entry__img";
+    img.src = url;
+    img.alt = "Attached photo";
+    box.appendChild(img);
+  } else if (media.type === "audio") {
+    const audio = document.createElement("audio");
+    audio.className = "entry__audio";
+    audio.controls = true;
+    audio.src = url;
+    box.appendChild(audio);
+  }
+}
+
 async function render() {
+  objectUrls.forEach(URL.revokeObjectURL); // free last render's URLs
+  objectUrls = [];
+
   const entries = await getEntries();
   if (!entries.length) {
     els.entries.innerHTML = `<p class="empty">No notes yet. Add your first field note below.</p>`;
     return;
   }
   els.entries.innerHTML = entries.map(entryTemplate).join("");
-  // Set text via textContent to avoid HTML injection from user input.
-  els.entries.querySelectorAll(".entry__text").forEach((node, i) => {
-    node.textContent = entries[i].text;
+
+  els.entries.querySelectorAll(".entry").forEach((node, i) => {
+    // Set text via textContent to avoid HTML injection from user input.
+    node.querySelector(".entry__text").textContent = entries[i].text;
+    if (entries[i].media) renderMedia(node.querySelector(".entry__media"), entries[i].media);
   });
 }
 
@@ -52,18 +89,60 @@ function toast(msg) {
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = els.text.value.trim();
-  if (!text) return;
+  if (!text && !pendingMedia) return; // need at least text or an attachment
 
   const entry = {
     id: crypto.randomUUID(),
     text,
+    media: pendingMedia, // { type, blob } | null — Blobs live happily in IndexedDB
     createdAt: Date.now(),
     synced: false,
   };
   await addEntry(entry);
   els.text.value = "";
+  clearAttachment();
   await render();
   await requestSync();
+});
+
+// ---------- Media capture ----------
+function showAttachment(type) {
+  els.attachLabel.textContent = type === "image" ? "📷 photo attached" : "🎙️ audio attached";
+  els.attachChip.hidden = false;
+}
+function clearAttachment() {
+  pendingMedia = null;
+  els.attachChip.hidden = true;
+}
+els.attachRemove.addEventListener("click", clearAttachment);
+
+els.addPhoto.addEventListener("click", async () => {
+  try {
+    const blob = await capturePhoto();
+    pendingMedia = { type: "image", blob };
+    showAttachment("image");
+  } catch (err) {
+    if (err.message !== "cancelled") toast(err.message);
+  }
+});
+
+els.addAudio.addEventListener("click", async () => {
+  try {
+    if (!isRecording()) {
+      await startAudio();
+      els.addAudio.classList.add("btn--recording");
+      els.addAudio.textContent = "⏺";
+      toast("Recording… tap again to stop");
+    } else {
+      const blob = await stopAudio();
+      els.addAudio.classList.remove("btn--recording");
+      els.addAudio.textContent = "🎙️";
+      pendingMedia = { type: "audio", blob };
+      showAttachment("audio");
+    }
+  } catch (err) {
+    toast(err.message || "Couldn't record audio");
+  }
 });
 
 // ---------- Connectivity ----------
