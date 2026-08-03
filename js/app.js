@@ -5,6 +5,7 @@
 
 import { addEntry, getEntries, getUnsynced, markSynced } from "/js/db.js";
 import { capturePhoto, startAudio, stopAudio, isRecording } from "/js/media.js";
+import { getPosition, getHeading } from "/js/geo.js";
 
 const els = {
   entries: document.getElementById("entries"),
@@ -16,23 +17,38 @@ const els = {
   iosHintClose: document.getElementById("ios-hint-close"),
   addPhoto: document.getElementById("add-photo"),
   addAudio: document.getElementById("add-audio"),
+  addLocation: document.getElementById("add-location"),
   attachChip: document.getElementById("attach-chip"),
   attachLabel: document.getElementById("attach-label"),
   attachRemove: document.getElementById("attach-remove"),
+  locChip: document.getElementById("loc-chip"),
+  locLabel: document.getElementById("loc-label"),
+  locRemove: document.getElementById("loc-remove"),
   toast: document.getElementById("toast"),
 };
 
 // Media the user attached but hasn't submitted yet: { type, blob } | null
 let pendingMedia = null;
+// Location the user attached but hasn't submitted yet: { lat, lng, heading } | null
+let pendingLocation = null;
 // Object URLs created for the current render, revoked before the next one.
 let objectUrls = [];
 
 // ---------- Rendering ----------
+// Turn a compass heading in degrees into a friendly "NE 45°" label.
+function headingLabel(deg) {
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return `${dirs[Math.round(deg / 45) % 8]} ${Math.round(deg)}°`;
+}
+
 function entryTemplate(e) {
   const when = new Date(e.createdAt).toLocaleString();
   const sync = e.synced ? "" : `<span class="badge badge--warn">queued</span>`;
+  const head = e.heading != null ? ` · 🧭 ${headingLabel(e.heading)}` : "";
   const loc =
-    e.lat != null ? `<span class="entry__loc">📍 ${e.lat.toFixed(3)}, ${e.lng.toFixed(3)}</span>` : "";
+    e.lat != null
+      ? `<span class="entry__loc">📍 ${e.lat.toFixed(3)}, ${e.lng.toFixed(3)}${head}</span>`
+      : "";
   return `<article class="entry">
     <p class="entry__text"></p>
     <div class="entry__media"></div>
@@ -89,18 +105,22 @@ function toast(msg) {
 els.form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = els.text.value.trim();
-  if (!text && !pendingMedia) return; // need at least text or an attachment
+  if (!text && !pendingMedia && !pendingLocation) return; // need something to save
 
   const entry = {
     id: crypto.randomUUID(),
     text,
     media: pendingMedia, // { type, blob } | null — Blobs live happily in IndexedDB
+    lat: pendingLocation?.lat ?? null,
+    lng: pendingLocation?.lng ?? null,
+    heading: pendingLocation?.heading ?? null,
     createdAt: Date.now(),
     synced: false,
   };
   await addEntry(entry);
   els.text.value = "";
   clearAttachment();
+  clearLocation();
   await render();
   await requestSync();
 });
@@ -142,6 +162,39 @@ els.addAudio.addEventListener("click", async () => {
     }
   } catch (err) {
     toast(err.message || "Couldn't record audio");
+  }
+});
+
+// ---------- Location ----------
+function showLocation({ lat, lng, heading }) {
+  const head = heading != null ? ` · 🧭 ${headingLabel(heading)}` : "";
+  els.locLabel.textContent = `📍 ${lat.toFixed(3)}, ${lng.toFixed(3)}${head}`;
+  els.locChip.hidden = false;
+}
+function clearLocation() {
+  pendingLocation = null;
+  els.locChip.hidden = true;
+}
+els.locRemove.addEventListener("click", clearLocation);
+
+els.addLocation.addEventListener("click", async () => {
+  els.addLocation.disabled = true;
+  toast("Getting your location…");
+  try {
+    const pos = await getPosition();
+    // Heading is a nice-to-have — never let a missing compass block the note.
+    let heading = null;
+    try {
+      heading = await getHeading();
+    } catch {
+      /* no magnetometer / denied — carry on without a heading */
+    }
+    pendingLocation = { lat: pos.lat, lng: pos.lng, heading };
+    showLocation(pendingLocation);
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    els.addLocation.disabled = false;
   }
 });
 

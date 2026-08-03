@@ -7,7 +7,7 @@
 // Bump CACHE_VERSION whenever the shell changes — old caches are deleted
 // on activate so users never get stuck on a stale build.
 
-const CACHE_VERSION = "fieldkit-v2";
+const CACHE_VERSION = "fieldkit-v3";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -18,6 +18,7 @@ const SHELL_ASSETS = [
   "/js/app.js",
   "/js/db.js",
   "/js/media.js",
+  "/js/geo.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
