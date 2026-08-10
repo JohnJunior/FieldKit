@@ -3,9 +3,10 @@
 // Per-feature modules (camera, geolocation, push, etc.) get added in
 // later milestones and imported here.
 
-import { addEntry, getEntries, getUnsynced, markSynced } from "/js/db.js";
+import { addEntry, getEntries, getUnsynced, markSynced, putEntry } from "/js/db.js";
 import { capturePhoto, startAudio, stopAudio, isRecording } from "/js/media.js";
 import { getPosition, getHeading } from "/js/geo.js";
+import { exportEntries, importEntries, shareEntry } from "/js/files.js";
 
 const els = {
   entries: document.getElementById("entries"),
@@ -13,6 +14,8 @@ const els = {
   text: document.getElementById("entry-text"),
   netStatus: document.getElementById("net-status"),
   installBtn: document.getElementById("install-btn"),
+  exportBtn: document.getElementById("export-btn"),
+  importBtn: document.getElementById("import-btn"),
   iosHint: document.getElementById("ios-hint"),
   iosHintClose: document.getElementById("ios-hint-close"),
   addPhoto: document.getElementById("add-photo"),
@@ -31,6 +34,8 @@ const els = {
 let pendingMedia = null;
 // Location the user attached but hasn't submitted yet: { lat, lng, heading } | null
 let pendingLocation = null;
+// Most recent render's entries, so per-entry actions (share) can look them up.
+let currentEntries = [];
 // Object URLs created for the current render, revoked before the next one.
 let objectUrls = [];
 
@@ -52,7 +57,10 @@ function entryTemplate(e) {
   return `<article class="entry">
     <p class="entry__text"></p>
     <div class="entry__media"></div>
-    <footer class="entry__meta"><time>${when}</time> ${loc} ${sync}</footer>
+    <footer class="entry__meta">
+      <time>${when}</time> ${loc} ${sync}
+      <button class="entry__share" data-id="${e.id}" aria-label="Share note" title="Share">Share</button>
+    </footer>
   </article>`;
 }
 
@@ -81,6 +89,7 @@ async function render() {
   objectUrls = [];
 
   const entries = await getEntries();
+  currentEntries = entries;
   if (!entries.length) {
     els.entries.innerHTML = `<p class="empty">No notes yet. Add your first field note below.</p>`;
     return;
@@ -198,6 +207,43 @@ els.addLocation.addEventListener("click", async () => {
   }
 });
 
+// ---------- Export / Import ----------
+els.exportBtn.addEventListener("click", async () => {
+  if (!currentEntries.length) return toast("Nothing to export yet");
+  try {
+    const result = await exportEntries(currentEntries);
+    if (result === "saved") toast("Exported");
+    else if (result === "downloaded") toast("Downloaded export file");
+  } catch (err) {
+    toast("Export failed: " + err.message);
+  }
+});
+
+els.importBtn.addEventListener("click", async () => {
+  try {
+    const imported = await importEntries();
+    if (!imported) return; // user cancelled
+    for (const entry of imported) await putEntry(entry); // upsert = safe re-import
+    await render();
+    toast(`Imported ${imported.length} note${imported.length === 1 ? "" : "s"}`);
+  } catch (err) {
+    toast("Import failed: " + err.message);
+  }
+});
+
+// ---------- Share a note (event delegation) ----------
+els.entries.addEventListener("click", async (event) => {
+  const btn = event.target.closest(".entry__share");
+  if (!btn) return;
+  const entry = currentEntries.find((e) => e.id === btn.dataset.id);
+  if (!entry) return;
+  try {
+    await shareEntry(entry);
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
 // ---------- Connectivity ----------
 function updateNetStatus() {
   const online = navigator.onLine;
@@ -304,5 +350,11 @@ async function boot() {
   updateNetStatus();
   maybeShowIosHint();
   await render();
+
+  // Arrived here from a Web Share Target POST? The SW already saved the entry.
+  if (new URLSearchParams(location.search).get("shared")) {
+    toast("Shared note added");
+    history.replaceState(null, "", "/"); // tidy the URL
+  }
 }
 boot();

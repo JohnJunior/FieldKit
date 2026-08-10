@@ -12,9 +12,9 @@ FieldKit is the companion project for an article series exploring what modern PW
 | Installable (manifest + install prompt) | ✅ built |
 | Capture photos & audio | ✅ built |
 | Push notifications | ⬜ planned |
-| Open, edit & save files | ⬜ planned |
+| Open, edit & save files | ✅ built |
 | Location-based experiences + sensors | ✅ built |
-| Native sharing | ⬜ planned |
+| Native sharing (Web Share + Share Target) | ✅ built |
 | Passkeys & biometric auth | ⬜ planned |
 | Payments | ⬜ planned |
 | Sensors & rich media | ⬜ planned |

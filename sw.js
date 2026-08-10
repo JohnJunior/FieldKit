@@ -7,7 +7,7 @@
 // Bump CACHE_VERSION whenever the shell changes — old caches are deleted
 // on activate so users never get stuck on a stale build.
 
-const CACHE_VERSION = "fieldkit-v3";
+const CACHE_VERSION = "fieldkit-v4";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -19,6 +19,7 @@ const SHELL_ASSETS = [
   "/js/db.js",
   "/js/media.js",
   "/js/geo.js",
+  "/js/files.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -49,7 +50,17 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-  if (request.method !== "GET") return; // never cache mutations
+  const url = new URL(request.url);
+
+  // Web Share Target: the OS shares INTO us as a POST to /share-target (see the
+  // manifest). We read the shared text/file, save it as an entry, then redirect
+  // back to the app — all with no server involved.
+  if (request.method === "POST" && url.pathname === "/share-target") {
+    event.respondWith(handleShareTarget(request));
+    return;
+  }
+
+  if (request.method !== "GET") return; // never cache other mutations
 
   // Navigation requests: network-first, fall back to cached shell offline.
   if (request.mode === "navigate") {
@@ -60,7 +71,6 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Static shell assets: cache-first for instant loads.
-  const url = new URL(request.url);
   if (SHELL_ASSETS.includes(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request))
@@ -92,4 +102,59 @@ async function notifyClientsToSync() {
   for (const client of clients) {
     client.postMessage({ type: "FLUSH_SYNC_QUEUE" });
   }
+}
+
+// ---------- Web Share Target ----------
+async function handleShareTarget(request) {
+  try {
+    const form = await request.formData();
+    const text = [form.get("title"), form.get("text")].filter(Boolean).join(" — ");
+    const file = form.get("media"); // File | null, per the manifest params
+
+    let media = null;
+    if (file && file.size) {
+      const type = file.type.startsWith("audio/") ? "audio" : "image";
+      media = { type, blob: file }; // a File is a Blob — stores fine in IndexedDB
+    }
+
+    await addSharedEntry({
+      id: (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()),
+      text: text || "Shared to FieldKit",
+      media,
+      lat: null,
+      lng: null,
+      heading: null,
+      createdAt: Date.now(),
+      synced: false,
+    });
+  } catch (err) {
+    // Even if saving fails, still send the user back into the app.
+    console.warn("share-target failed:", err);
+  }
+  // Redirect (303) so the browser does a GET of the app, not a POST replay.
+  return Response.redirect("/?shared=1", 303);
+}
+
+// Minimal IndexedDB writer living in the SW. Must mirror db.js's schema
+// (db "fieldkit", store "entries", keyPath "id") so the page reads it back.
+function addSharedEntry(entry) {
+  return new Promise((resolve, reject) => {
+    const open = indexedDB.open("fieldkit", 1);
+    open.onupgradeneeded = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains("entries")) {
+        const store = db.createObjectStore("entries", { keyPath: "id" });
+        store.createIndex("createdAt", "createdAt");
+        store.createIndex("synced", "synced");
+      }
+    };
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction("entries", "readwrite");
+      tx.objectStore("entries").put(entry);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+    open.onerror = () => reject(open.error);
+  });
 }

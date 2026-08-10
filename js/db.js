@@ -50,6 +50,17 @@ export async function getUnsynced() {
   return all.filter((e) => !e.synced);
 }
 
+// Upsert — used by import so re-importing the same file doesn't throw on
+// duplicate keys the way add() would.
+export async function putEntry(entry) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const req = tx(db, "readwrite").put(entry);
+    req.onsuccess = () => resolve(entry);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function markSynced(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
