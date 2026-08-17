@@ -7,7 +7,7 @@
 // Bump CACHE_VERSION whenever the shell changes — old caches are deleted
 // on activate so users never get stuck on a stale build.
 
-const CACHE_VERSION = "fieldkit-v4";
+const CACHE_VERSION = "fieldkit-v5";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -20,6 +20,7 @@ const SHELL_ASSETS = [
   "/js/media.js",
   "/js/geo.js",
   "/js/files.js",
+  "/js/push.js",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -103,6 +104,43 @@ async function notifyClientsToSync() {
     client.postMessage({ type: "FLUSH_SYNC_QUEUE" });
   }
 }
+
+// ---------- Push notifications ----------
+// A real push server (holding the VAPID private key) POSTs to the browser's
+// push service, which wakes the SW with this event — even if no tab is open.
+self.addEventListener("push", (event) => {
+  let data = { title: "FieldKit", body: "You have a new update.", url: "/" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    if (event.data) data.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: data.url,
+    })
+  );
+});
+
+// Focus an existing window if we have one, otherwise open a new one.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data || "/";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      const open = all.find((c) => c.url.startsWith(self.location.origin));
+      if (open) return open.focus();
+      return self.clients.openWindow(target);
+    })()
+  );
+});
 
 // ---------- Web Share Target ----------
 async function handleShareTarget(request) {

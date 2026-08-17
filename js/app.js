@@ -7,6 +7,12 @@ import { addEntry, getEntries, getUnsynced, markSynced, putEntry } from "/js/db.
 import { capturePhoto, startAudio, stopAudio, isRecording } from "/js/media.js";
 import { getPosition, getHeading } from "/js/geo.js";
 import { exportEntries, importEntries, shareEntry } from "/js/files.js";
+import {
+  pushSupported,
+  enableNotifications,
+  showLocalNotification,
+  subscribeToPush,
+} from "/js/push.js";
 
 const els = {
   entries: document.getElementById("entries"),
@@ -16,6 +22,7 @@ const els = {
   installBtn: document.getElementById("install-btn"),
   exportBtn: document.getElementById("export-btn"),
   importBtn: document.getElementById("import-btn"),
+  remindersBtn: document.getElementById("reminders-btn"),
   iosHint: document.getElementById("ios-hint"),
   iosHintClose: document.getElementById("ios-hint-close"),
   addPhoto: document.getElementById("add-photo"),
@@ -228,6 +235,28 @@ els.importBtn.addEventListener("click", async () => {
     toast(`Imported ${imported.length} note${imported.length === 1 ? "" : "s"}`);
   } catch (err) {
     toast("Import failed: " + err.message);
+  }
+});
+
+// ---------- Reminders / push ----------
+if (!pushSupported()) els.remindersBtn.hidden = true;
+
+els.remindersBtn.addEventListener("click", async () => {
+  try {
+    await enableNotifications();
+    // Best-effort subscription: needs a real server + VAPID key to deliver.
+    try {
+      await subscribeToPush();
+    } catch {
+      /* no push server configured — the local demo still works */
+    }
+    await showLocalNotification(
+      "Reminders on",
+      "FieldKit will nudge you to review your field notes."
+    );
+    toast("Reminders enabled");
+  } catch (err) {
+    toast(err.message);
   }
 });
 
