@@ -15,6 +15,7 @@
     <h1>FieldKit</h1>
     <div class="app-bar__actions">
       <span id="net-status" class="badge" aria-live="polite">online</span>
+      <button id="lock-btn" class="btn btn--ghost" title="Lock with a passkey">🔒</button>
       <button id="reminders-btn" class="btn btn--ghost" title="Enable reminders">🔔</button>
       <button id="import-btn" class="btn btn--ghost" title="Import notes">Import</button>
       <button id="export-btn" class="btn btn--ghost" title="Export notes">Export</button>
@@ -57,6 +58,16 @@
   <div id="ios-hint" class="ios-hint" hidden>
     <span>Install FieldKit: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</span>
     <button id="ios-hint-close" class="ios-hint__close" aria-label="Dismiss">&times;</button>
+  </div>
+
+  <!-- Shown when notes are locked behind a passkey. -->
+  <div id="lock-screen" class="lock" hidden>
+    <div class="lock__card">
+      <div class="lock__icon">🔒</div>
+      <h2>FieldKit is locked</h2>
+      <p>Unlock with your passkey to view your notes.</p>
+      <button id="unlock-btn" class="btn btn--primary">Unlock</button>
+    </div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

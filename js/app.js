@@ -13,6 +13,12 @@ import {
   showLocalNotification,
   subscribeToPush,
 } from "/js/push.js";
+import {
+  passkeySupported,
+  hasPasskey,
+  registerPasskey,
+  authenticatePasskey,
+} from "/js/auth.js";
 
 const els = {
   entries: document.getElementById("entries"),
@@ -23,6 +29,9 @@ const els = {
   exportBtn: document.getElementById("export-btn"),
   importBtn: document.getElementById("import-btn"),
   remindersBtn: document.getElementById("reminders-btn"),
+  lockBtn: document.getElementById("lock-btn"),
+  lockScreen: document.getElementById("lock-screen"),
+  unlockBtn: document.getElementById("unlock-btn"),
   iosHint: document.getElementById("ios-hint"),
   iosHintClose: document.getElementById("ios-hint-close"),
   addPhoto: document.getElementById("add-photo"),
@@ -238,6 +247,39 @@ els.importBtn.addEventListener("click", async () => {
   }
 });
 
+// ---------- Passkey lock ----------
+if (!passkeySupported()) els.lockBtn.hidden = true;
+
+function showLock() {
+  els.entries.innerHTML = ""; // keep notes out of the DOM while locked
+  els.lockScreen.hidden = false;
+}
+async function unlock() {
+  els.lockScreen.hidden = true;
+  await render();
+}
+
+els.lockBtn.addEventListener("click", async () => {
+  try {
+    if (!hasPasskey()) {
+      await registerPasskey();
+      toast("Passkey set — notes are now protected");
+    }
+    showLock();
+  } catch (err) {
+    toast(err.message || "Couldn't set up a passkey");
+  }
+});
+
+els.unlockBtn.addEventListener("click", async () => {
+  try {
+    await authenticatePasskey();
+    await unlock();
+  } catch (err) {
+    toast(err.message || "Unlock failed");
+  }
+});
+
 // ---------- Reminders / push ----------
 if (!pushSupported()) els.remindersBtn.hidden = true;
 
@@ -378,7 +420,13 @@ async function boot() {
   }
   updateNetStatus();
   maybeShowIosHint();
-  await render();
+
+  // If the user locked FieldKit, don't render notes until they pass the passkey.
+  if (hasPasskey()) {
+    showLock();
+  } else {
+    await render();
+  }
 
   // Arrived here from a Web Share Target POST? The SW already saved the entry.
   if (new URLSearchParams(location.search).get("shared")) {

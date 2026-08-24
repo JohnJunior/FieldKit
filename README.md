@@ -15,8 +15,8 @@ FieldKit is the companion project for an article series exploring what modern PW
 | Open, edit & save files | ✅ built |
 | Location-based experiences + sensors | ✅ built |
 | Native sharing (Web Share + Share Target) | ✅ built |
-| Passkeys & biometric auth | ⬜ planned |
-| Payments | ⬜ planned |
+| Passkeys & biometric auth | ✅ built (client-side lock; server verification documented) |
+| Payments | 📄 documented (Payment Request API + limitations) |
 
 ## Run it
 
