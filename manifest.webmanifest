@@ -2,6 +2,7 @@
   "name": "FieldKit — Offline Field Notes",
   "short_name": "FieldKit",
   "description": "Capture geotagged field notes, photos, and audio that work fully offline.",
+  "id": "/?source=pwa",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

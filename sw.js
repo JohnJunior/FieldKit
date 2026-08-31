@@ -7,7 +7,7 @@
 // Bump CACHE_VERSION whenever the shell changes — old caches are deleted
 // on activate so users never get stuck on a stale build.
 
-const CACHE_VERSION = "fieldkit-v6";
+const CACHE_VERSION = "fieldkit-v7";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
